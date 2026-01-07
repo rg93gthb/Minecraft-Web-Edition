@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Minecraft 1.12 Web Edition - Main Menu</title>
+<style>
+body { margin:0; overflow:hidden; background:#87CEEB; font-family:sans-serif; }
+#crosshair {
+ position:absolute; top:50%; left:50%;
+ width:18px; height:18px;
+ border:2px solid white;
+ transform:translate(-50%,-50%);
+ pointer-events:none;
+ mix-blend-mode:difference;
+}
+#hotbar {
+ position:absolute; bottom:20px; left:50%;
+ transform:translateX(-50%);
+ display:flex; background:rgba(0,0,0,0.8);
+ padding:5px; border:4px solid #333; gap:5px;
+}
+.slot {
+ width:50px; height:50px; border:2px solid #555;
+ display:flex; align-items:center; justify-content:center;
+ color:white; font-size:10px; text-align:center;
+}
+.active { border:3px solid white; background:rgba(255,255,255,0.4); }
+
+/* --- MAIN MENU STYLES --- */
+#menu {
+ position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+ background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.12.2/assets/minecraft/textures/gui/options_background.png');
+ background-size: 64px; background-repeat: repeat;
+ display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100;
+}
+#menu-title { color: white; font-size: 80px; font-weight: bold; margin-bottom: 40px; text-shadow: 4px 4px #000; }
+.menu-btn {
+ width: 300px; height: 50px; background: #555; border: 2px solid #000; color: white;
+ font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+ box-shadow: inset -2px -2px #222, inset 2px 2px #888;
+}
+.menu-btn:hover { background: #666; border-color: #fff; }
+</style>
+</head>
+<body>
+
+<div id="menu">
+ <div id="menu-title">MINECRAFT</div>
+ <div class="menu-btn" onclick="startGame()">Play Game</div>
+</div>
+
+<div id="crosshair"></div>
+<div id="hotbar">
+ <div class="slot active">Grass</div>
+ <div class="slot">Dirt</div>
+ <div class="slot">Stone</div>
+ <div class="slot">Cobble</div>
+ <div class="slot">Log</div>
+ <div class="slot">Leaves</div>
+ <div class="slot">Plank</div>
+ <div class="slot">Glass</div>
+ <div class="slot">Water</div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
+import { PointerLockControls } from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/PointerLockControls.js';
+
+// --- AUDIO ENGINE ---
+const musicTracks = ['danny.mp3', 'mice.mp3'];
+const bgMusic = new Audio();
+const breakSound = new Audio('break.mp3');
+const placeSound = new Audio('place.mp3');
+const walkSound = new Audio('walk.mp3');
+
+let musicStarted = false;
+let gameRunning = false;
+
+window.startGame = function() {
+    document.getElementById('menu').style.display = 'none';
+    gameRunning = true;
+    controls.lock();
+    if(!musicStarted) {
+        bgMusic.src = musicTracks[0];
+        bgMusic.volume = 0.3;
+        bgMusic.play();
+        musicStarted = true;
+    }
+};
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({antialias:false});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const loader = new THREE.TextureLoader();
+const loadT = u => {
+ const t = loader.load(u);
+ t.magFilter = t.minFilter = THREE.NearestFilter;
+ return t;
+};
+
+const tex = {
+ grass_side: loadT('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.12.2/assets/minecraft/textures/blocks/grass_side.png'),
+ grass_top: loadT('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.12.2/assets/minecraft/textures/blocks/grass_top.png'),
+ dirt: loadT('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.12.2/assets/minecraft/textures/blocks/dirt.png'),
+ stone: loadT('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.12.2/assets/minecraft/textures/blocks/stone.png'),
+ cobble: loadT('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.12.2/assets/minecraft/textures/blocks/cobblestone.png'),
+ log: loadT('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.12.2/assets/minecraft/textures/blocks/log_oak.png'),
+ leaf: loadT('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.12.2/assets/minecraft/textures/blocks/leaves_oak.png'),
+ plank: loadT('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.12.2/assets/minecraft/textures/blocks/planks_oak.png'),
+ water: loadT('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.12.2/assets/minecraft/textures/blocks/water_still.png')
+};
+
+const grassColor = new THREE.Color(0x7fb238);
+const mats = [
+ [new THREE.MeshStandardMaterial({map:tex.grass_side}), new THREE.MeshStandardMaterial({map:tex.grass_side}), new THREE.MeshStandardMaterial({map:tex.grass_top,color:grassColor}), new THREE.MeshStandardMaterial({map:tex.dirt}), new THREE.MeshStandardMaterial({map:tex.grass_side}), new THREE.MeshStandardMaterial({map:tex.grass_side})],
+ new THREE.MeshStandardMaterial({map:tex.dirt}),
+ new THREE.MeshStandardMaterial({map:tex.stone}),
+ new THREE.MeshStandardMaterial({map:tex.cobble}),
+ new THREE.MeshStandardMaterial({map:tex.log}),
+ new THREE.MeshStandardMaterial({map:tex.leaf,color:0x2d4e10,transparent:true, alphaTest: 0.5}),
+ new THREE.MeshStandardMaterial({map:tex.plank}),
+ new THREE.MeshStandardMaterial({map:tex.water,transparent:true,opacity:0.8})
+];
+
+const blocks = [];
+const geo = new THREE.BoxGeometry(1,1,1);
+let selected = 0;
+
+function addBlock(x,y,z,t){
+ const m = new THREE.Mesh(geo,mats[t]);
+ m.position.set(x,y,z);
+ scene.add(m);
+ blocks.push(m);
+ return m;
+}
+
+const getTerrainHeight = (x, z) => Math.floor(Math.sin(x/8)*Math.cos(z/8)*2);
+
+const SIZE = 40;
+for(let x=-SIZE;x<=SIZE;x++){
+ for(let z=-SIZE;z<=SIZE;z++){
+  if(Math.abs(x)===SIZE || Math.abs(z)===SIZE){
+   for(let y=-2;y<=0;y++) addBlock(x,y,z,7);
+   continue;
+  }
+  const y = getTerrainHeight(x, z);
+  addBlock(x,y,z,0);
+ }
+}
+
+function tree(x, z){
+ const y = getTerrainHeight(x, z);
+ const h = 4+Math.floor(Math.random()*2);
+ for(let i=1;i<=h;i++) addBlock(x,y+i,z,4);
+ for(let lx=-2;lx<=2;lx++){
+  for(let lz=-2;lz<=2;lz++){
+   for(let ly=h-1;ly<=h+1;ly++){
+    if(Math.abs(lx)+Math.abs(lz)<3) addBlock(x+lx,y+ly,z+lz,5);
+   }
+  }
+ }
+}
+
+for(let i=0;i<15;i++){
+ const x=Math.floor(Math.random()*30-15);
+ const z=Math.floor(Math.random()*30-15);
+ tree(x, z);
+}
+
+scene.add(new THREE.AmbientLight(0xffffff,0.7));
+const sun = new THREE.DirectionalLight(0xffffff,0.5);
+sun.position.set(10,20,10);
+scene.add(sun);
+
+const controls = new PointerLockControls(camera,document.body);
+
+controls.addEventListener('unlock', () => {
+    if(gameRunning) document.getElementById('menu').style.display = 'flex';
+});
+
+const raycaster = new THREE.Raycaster();
+const keys = {};
+let vel = new THREE.Vector3();
+
+function updateHotbar() {
+ const slots = document.querySelectorAll('.slot');
+ slots.forEach((s, i) => {
+  s.classList.toggle('active', i === selected);
+ });
+}
+
+window.addEventListener('keydown',e=>{
+ keys[e.code]=true;
+ if(e.key>=1 && e.key<=9) {
+    selected = parseInt(e.key)-1;
+    updateHotbar();
+ }
+});
+
+window.addEventListener('wheel', e => {
+ if(e.deltaY > 0) selected = (selected + 1) % 9;
+ else selected = (selected - 1 + 9) % 9;
+ updateHotbar();
+});
+
+window.addEventListener('keyup',e=>keys[e.code]=false);
+
+window.addEventListener('mousedown',e=>{
+ if(!controls.isLocked) return;
+ raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+ const hit = raycaster.intersectObjects(blocks)[0];
+ if(!hit) return;
+ if(e.button===0){ // BREAK
+  breakSound.currentTime = 0;
+  breakSound.play();
+  scene.remove(hit.object);
+  blocks.splice(blocks.indexOf(hit.object),1);
+ }
+ if(e.button===2){ // PLACE
+  placeSound.currentTime = 0;
+  placeSound.play();
+  const p = hit.object.position.clone().add(hit.face.normal);
+  addBlock(p.x,p.y,p.z,selected);
+ }
+});
+
+function checkCollision(pos) {
+ for(const b of blocks) {
+  if (Math.abs(pos.x - b.position.x) < 0.7 &&
+      Math.abs(pos.z - b.position.z) < 0.7 &&
+      pos.y - 1.5 < b.position.y && pos.y > b.position.y - 0.5) {
+   return true;
+  }
+ }
+ return false;
+}
+
+camera.position.set(0,6,0);
+
+let walkTimer = 0;
+function animate(){
+ requestAnimationFrame(animate);
+ if(controls.isLocked){
+  vel.y -= 0.01; 
+  camera.position.y += vel.y;
+
+  let ground = false;
+  for(const b of blocks){
+   if(Math.abs(camera.position.x-b.position.x)<0.6 &&
+      Math.abs(camera.position.z-b.position.z)<0.6 &&
+      camera.position.y > b.position.y + 1.4 &&
+      camera.position.y < b.position.y + 2){
+    camera.position.y = b.position.y + 2;
+    vel.y = 0; ground = true;
+   }
+  }
+
+  if(ground && (keys.KeyW || keys.KeyS || keys.KeyA || keys.KeyD)){
+    walkTimer += 0.1;
+    if(walkTimer > 2.5){
+        walkSound.currentTime = 0;
+        walkSound.volume = 0.15;
+        walkSound.play();
+        walkTimer = 0;
+    }
+  }
+
+  const s = 0.12;
+  const oldPos = camera.position.clone();
+  if(keys.KeyW) controls.moveForward(s);
+  if(keys.KeyS) controls.moveForward(-s);
+  if(keys.KeyA) controls.moveRight(-s);
+  if(keys.KeyD) controls.moveRight(s);
+
+  if (checkCollision(camera.position)) {
+    camera.position.x = oldPos.x;
+    camera.position.z = oldPos.z;
+  }
+
+  if(keys.Space && ground) vel.y = 0.2;
+ }
+ renderer.render(scene,camera);
+}
+animate();
+window.oncontextmenu=e=>e.preventDefault();
+</script>
+</body>
+</html>
